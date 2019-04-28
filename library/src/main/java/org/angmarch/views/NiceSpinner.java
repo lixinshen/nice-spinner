@@ -5,6 +5,8 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
@@ -22,10 +24,12 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.PopupWindow;
+import android.widget.TextView;
 
 import java.util.Arrays;
 import java.util.List;
@@ -56,7 +60,12 @@ public class NiceSpinner extends AppCompatTextView {
     private static final String ARROW_DRAWABLE_RES_ID = "arrow_drawable_res_id";
     public static final int VERTICAL_OFFSET = 1;
 
-    private int selectedIndex;
+    // change: Whether to keep the items in the list, when one is selected.
+    private boolean isFixItem = false;
+
+//    private int selectedIndex;
+    // change: The default value of selectedIndex is -1, indicating that no items are selected.
+    private int selectedIndex = -1;
     private Drawable arrowDrawable;
     private PopupWindow popupWindow;
     private ListView listView;
@@ -113,7 +122,9 @@ public class NiceSpinner extends AppCompatTextView {
             Bundle bundle = (Bundle) savedState;
             selectedIndex = bundle.getInt(SELECTED_INDEX);
 
-            if (adapter != null) {
+//            if (adapter != null) {
+            // change add condition: when selectedIndex is not -1
+            if (adapter != null && selectedIndex != -1) {
                 setTextInternal(selectedTextFormatter.format(adapter.getItemInDataset(selectedIndex)).toString());
                 adapter.setSelectedIndex(selectedIndex);
             }
@@ -142,7 +153,9 @@ public class NiceSpinner extends AppCompatTextView {
         TypedArray typedArray = context.obtainStyledAttributes(attrs, R.styleable.NiceSpinner);
         int defaultPadding = resources.getDimensionPixelSize(R.dimen.one_and_a_half_grid_unit);
 
-        setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+//        setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+        // change: default Gravity is CENTER
+        setGravity(Gravity.CENTER);
         setPadding(resources.getDimensionPixelSize(R.dimen.three_grid_unit), defaultPadding, defaultPadding,
                 defaultPadding);
         setClickable(true);
@@ -167,7 +180,9 @@ public class NiceSpinner extends AppCompatTextView {
                 // The selected item is not displayed within the list, so when the selected position is equal to
                 // the one of the currently selected item it gets shifted to the next item.
                 int offsetPosition = position;
-                if (position >= selectedIndex && position < adapter.getCount()) {
+//                if (position >= selectedIndex && position < adapter.getCount()) {
+                // change: when isFixItem is true, keep item.
+                if (!isFixItem && position >= selectedIndex && position < adapter.getCount()) {
                     offsetPosition++;
                 }
 
@@ -181,6 +196,11 @@ public class NiceSpinner extends AppCompatTextView {
                     onItemSelectedListener.onItemSelected(parent, view, position, id);
                 }
 
+                // change: Call this callback, passing only one parameter
+                if (functionalCallback != null) {
+                    functionalCallback.onItemSelected(position);
+                }
+
                 adapter.setSelectedIndex(offsetPosition);
                 setTextInternal(selectedTextFormatter.format(adapter.getItemInDataset(offsetPosition)).toString());
                 dismissDropDown();
@@ -188,7 +208,8 @@ public class NiceSpinner extends AppCompatTextView {
         });
 
         popupWindow = new PopupWindow(context);
-        popupWindow.setContentView(listView);
+        // change: see setAdapterInternal().
+//        popupWindow.setContentView(listView);
         popupWindow.setOutsideTouchable(true);
         popupWindow.setFocusable(true);
 
@@ -216,6 +237,9 @@ public class NiceSpinner extends AppCompatTextView {
         horizontalAlignment = PopUpTextAlignment.fromId(
                 typedArray.getInt(R.styleable.NiceSpinner_popupTextAlignment, PopUpTextAlignment.CENTER.ordinal())
         );
+
+        // change: add condition from declare-styleable 'fixItem'
+        isFixItem = typedArray.getBoolean(R.styleable.NiceSpinner_fixItem, false);
 
         CharSequence[] entries = typedArray.getTextArray(R.styleable.NiceSpinner_entries);
         if (entries != null) {
@@ -294,7 +318,9 @@ public class NiceSpinner extends AppCompatTextView {
     }
 
     public Object getSelectedItem() {
-        return adapter.getItemInDataset(selectedIndex);
+//        return adapter.getItemInDataset(selectedIndex);
+        // change: Maybe return null.
+        return adapter == null || selectedIndex == -1 ? null : adapter.getItemInDataset(selectedIndex);
     }
 
     public int getSelectedIndex() {
@@ -360,12 +386,84 @@ public class NiceSpinner extends AppCompatTextView {
         return horizontalAlignment;
     }
 
+    // change: Determine the minimum width based on the widest item in the list.
+    private boolean isEmptyList = false;
+    private int minNiceSpinnerWidth = -1;
+    private int maxTextWidthWithInList = -1;
+
     private void setAdapterInternal(NiceSpinnerBaseAdapter adapter) {
         // If the adapter needs to be settled again, ensure to reset the selected index as well
         selectedIndex = 0;
         listView.setAdapter(adapter);
-        setTextInternal(selectedTextFormatter.format(adapter.getItemInDataset(selectedIndex)).toString());
+
+//        setTextInternal(selectedTextFormatter.format(adapter.getItemInDataset(selectedIndex)).toString());
+        // change: replace default text
+        setTextInternal(getContext().getString(R.string.tip_please_select));
+
+        isEmptyList = adapter == null || adapter.getCount() == 0;
+        if (!isEmptyList) {
+            popupWindow.setContentView(listView);
+            // record the textView width based on the longest content
+            if (spinnerTextFormatter != null) {
+                Rect rect = new Rect();
+                Paint paint = getPaint();
+                int maxTextWidth = 0;
+                for (int i = 0; i < adapter.getCount(); i++) {
+                    String strTemp = spinnerTextFormatter.format(adapter.getItem(i)).toString();
+                    paint.getTextBounds(strTemp, 0, strTemp.length(), rect);
+
+                    int textWidth = rect.width();
+                    if (textWidth > maxTextWidth) {
+                        maxTextWidth = textWidth;
+                    }
+                }
+                if (maxTextWidth > 0) {
+                    maxTextWidthWithInList = maxTextWidth;
+                }
+            }
+        } else {
+            TextView noDataTextView = new TextView(getContext());
+            noDataTextView.setTextColor(textColor);
+            noDataTextView.setTextSize(TypedValue.COMPLEX_UNIT_PX,
+                    getContext().getResources().getDimension(R.dimen.normal_content_font_size));
+            noDataTextView.setGravity(Gravity.CENTER);
+            noDataTextView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                    getHeight()));
+            noDataTextView.setText(getContext().getString(R.string.no_data));
+            // on click the tip textView, dismiss popupWindow.
+            noDataTextView.setOnClickListener(new OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    NiceSpinner.this.dismissDropDown();
+                }
+            });
+            popupWindow.setContentView(noDataTextView);
+        }
+
     }
+
+    // BEGIN CHANGE: override onMeasure() method, set nice spinner min width with maxTextWidthWithInList.
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+
+        if (minNiceSpinnerWidth == -1) {
+            minNiceSpinnerWidth = 0;
+            if (maxTextWidthWithInList != -1) {
+                minNiceSpinnerWidth += maxTextWidthWithInList;
+            }
+            // add padding left and padding right
+            minNiceSpinnerWidth += getPaddingLeft() + getPaddingRight();
+            if (arrowDrawable != null) {
+                minNiceSpinnerWidth += arrowDrawable.getIntrinsicWidth();
+            }
+            if (minNiceSpinnerWidth != 0) {
+                setMinWidth(minNiceSpinnerWidth);
+            }
+        }
+
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+    }
+    // END CHANGE: override onMeasure() method, set nice spinner min width with maxTextWidthWithInList.
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
@@ -398,7 +496,15 @@ public class NiceSpinner extends AppCompatTextView {
         if (!isArrowHidden) {
             animateArrow(true);
         }
-        measurePopUpDimension();
+//        measurePopUpDimension();
+        // BEGIN CHANGE: invoke measure when !isEmptyList.
+        if (!isEmptyList) {
+            measurePopUpDimension();
+        } else {
+            popupWindow.setWidth(getWidth());
+            popupWindow.setHeight(getHeight());
+        }
+        // END CHANGE: invoke measure when !isEmptyList.
         popupWindow.showAsDropDown(this);
     }
 
@@ -463,4 +569,16 @@ public class NiceSpinner extends AppCompatTextView {
     public void setSelectedTextFormatter(SpinnerTextFormatter textFormatter) {
         this.selectedTextFormatter = textFormatter;
     }
+
+    // BEGIN CHANGE: add functional interface callback.
+    private OnItemSelectedFunctionalCallback functionalCallback;
+    @FunctionalInterface
+    public interface OnItemSelectedFunctionalCallback {
+        // passing only one parameter.
+        void onItemSelected(int position);
+    }
+    public void setSimpleCallback(OnItemSelectedFunctionalCallback callback) {
+        this.functionalCallback = callback;
+    }
+    // END CHANGE: add functional interface callback.
 }

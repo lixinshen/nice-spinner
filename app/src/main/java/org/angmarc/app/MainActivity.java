@@ -25,6 +25,28 @@ public class MainActivity extends AppCompatActivity {
         setupDefault();
         setupTintedWithCustomClass();
         setupXml();
+
+        testFixItem();
+        testFixItemWithNoData();
+    }
+
+    private void testFixItem() {
+        NiceSpinner spinner = findViewById(R.id.fix_item_nice_spinner);
+        List<Person> persons = new ArrayList<>();
+
+        persons.add(new Person("Tony", "Stark"));
+        persons.add(new Person("Steve", "Rogers"));
+        persons.add(new Person("Bruce", "Banner"));
+        spinner.attachDataSource(persons);
+
+        spinner.setSimpleCallback((v) -> {
+            Toast.makeText(MainActivity.this, "position: " + v + ", bean -> " + persons.get(v), Toast.LENGTH_SHORT).show();
+        });
+    }
+
+    private void testFixItemWithNoData() {
+        NiceSpinner spinner = findViewById(R.id.no_data_nice_spinner);
+        spinner.attachDataSource(new ArrayList<String>());
     }
 
     private void setupXml() {
