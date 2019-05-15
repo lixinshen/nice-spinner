@@ -1,3 +1,10 @@
+更改了下拉列表选择项的选择形式，已选项目保留在列表中。
+增加了下拉列表默认的初始值。
+更改了selectedIndex默认值为-1。
+更改了在未指定固定宽度时，宽度自适应item中最长文本宽度(未考虑超过一屏的情况)。
+
+
+
 # Nice Spinner [![](https://jitpack.io/v/arcadefire/nice-spinner.svg)](https://jitpack.io/#arcadefire/nice-spinner) [![Android Arsenal](https://img.shields.io/badge/Android%20Arsenal-Nice%20Spinner-blue.svg?style=flat)](https://android-arsenal.com/details/1/2225)
 
 NiceSpinner is a re-implementation of the default Android's spinner, with a nice arrow animation and a different way to display its content.

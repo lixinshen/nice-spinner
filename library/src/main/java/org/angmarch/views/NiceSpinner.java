@@ -393,7 +393,7 @@ public class NiceSpinner extends AppCompatTextView {
 
     private void setAdapterInternal(NiceSpinnerBaseAdapter adapter) {
         // If the adapter needs to be settled again, ensure to reset the selected index as well
-        selectedIndex = 0;
+        selectedIndex = -1;
         listView.setAdapter(adapter);
 
 //        setTextInternal(selectedTextFormatter.format(adapter.getItemInDataset(selectedIndex)).toString());
@@ -446,7 +446,9 @@ public class NiceSpinner extends AppCompatTextView {
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 
-        if (minNiceSpinnerWidth == -1) {
+        int widthMode = MeasureSpec.getMode(widthMeasureSpec);
+
+        if (widthMode != MeasureSpec.EXACTLY && minNiceSpinnerWidth == -1) {
             minNiceSpinnerWidth = 0;
             if (maxTextWidthWithInList != -1) {
                 minNiceSpinnerWidth += maxTextWidthWithInList;
